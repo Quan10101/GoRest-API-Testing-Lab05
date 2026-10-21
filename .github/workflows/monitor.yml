@@ -1,0 +1,38 @@
+
+name: GoRest API Monitor
+
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check GoRest API
+        run: |
+          result=$(curl -s -o /dev/null \
+            -w "%{http_code} %{time_total}" \
+            https://gorest.co.in/public/v2/users)
+
+          read status duration <<< "$result"
+
+          echo "HTTP Status: $status"
+          echo "Response Time: ${duration}s"
+
+          if [ "$status" != "200" ]; then
+            echo "API failed"
+            exit 1
+          fi
+
+          awk -v t="$duration" 'BEGIN {
+            if (t < 0.8) exit 0;
+            exit 1;
+          }' || {
+            echo "Response time exceeded 800ms"
+            exit 1
+          }
+
+          echo "API Monitor Passed"
